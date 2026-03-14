@@ -12,6 +12,8 @@ Risk per trade is fixed in dollar terms for consistent position sizing
 Inputs are fully configurable — EMA lengths, ADX threshold, pullback depth, volume multiplier, risk amount, and R:R ratio can all be tuned to your instrument and timeframe.
 Built for: BTC 1H TF ONLY! 
 
+USE IT STRICTLY ON BTC BINANCE PERPETUAL TOKEN ONLY! 
+
 RECOMMENDED SETTINGS :
 EMA - 9,15
 ADX LENGTH - 16
