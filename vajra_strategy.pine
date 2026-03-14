@@ -1,0 +1,81 @@
+//@version=5
+strategy("Vajra", overlay=true,
+     initial_capital=1000,
+     default_qty_type=strategy.cash,
+     default_qty_value=100)
+
+// ======================
+// INPUTS
+// ======================
+emaFastLen   = input.int(9,  "Fast EMA Length")
+emaSlowLen   = input.int(15, "Slow EMA Length")
+
+rrRatio      = input.float(1.3, "Risk Reward Ratio", step=0.1)
+riskCash     = input.float(100, "Risk Per Trade ($)")
+
+pullbackLookback = input.int(5, "Pullback Lookback Bars")
+maxPullbackPct   = input.float(1.5, "Max Pullback %", step=0.1)
+
+volMultiplier = input.float(1.2, "Volume Multiplier")
+
+emaAngleMin = input.float(30.0, "Minimum EMA Angle (degrees)")
+adxLen      = input.int(14, "ADX Length")
+adxMin      = input.float(25.0, "Minimum ADX")
+
+// ======================
+// INDICATORS
+// ======================
+emaFast = ta.ema(close, emaFastLen)
+emaSlow = ta.ema(close, emaSlowLen)
+volMA   = ta.sma(volume, 20)
+
+emaSlopeRaw = emaFast - emaFast[1]
+emaSlopeDeg = math.atan(emaSlopeRaw) * 180 / math.pi
+
+[diplus, diminus, adxValue] = ta.dmi(adxLen, adxLen)
+
+// ======================
+// CONDITIONS
+// ======================
+isGreenCandle = close > open
+aboveEMAs     = close > emaFast and close > emaSlow
+trendUp       = emaFast > emaSlow
+volumeOK      = volume > volMA * volMultiplier
+emaAngleOK    = emaSlopeDeg >= emaAngleMin
+adxOK         = adxValue >= adxMin
+
+highestRecent = ta.highest(high, pullbackLookback)
+pullbackDepth = (highestRecent - close) / highestRecent * 100
+controlledPullback = pullbackDepth <= maxPullbackPct
+nearEMA = low <= emaFast or low <= emaSlow
+pullbackQuality = controlledPullback and nearEMA
+
+buyCondition = isGreenCandle and aboveEMAs and trendUp and volumeOK and emaAngleOK and adxOK and pullbackQuality
+
+// ======================
+// TRADE LOGIC
+// ======================
+var float stopPrice   = na
+var float targetPrice = na
+
+if buyCondition and strategy.position_size == 0
+    stopPrice := low
+    riskPerUnit = close - stopPrice
+    riskPerUnit := riskPerUnit <= 0 ? na : riskPerUnit
+    qty = riskCash / riskPerUnit
+    targetPrice := close + (riskPerUnit * rrRatio)
+    strategy.entry("BUY", strategy.long, qty=qty)
+    strategy.exit("TP/SL", "BUY", stop=stopPrice, limit=targetPrice)
+
+// ======================
+// ALERT (SINGLE LINE)
+// ======================
+alertcondition(buyCondition and strategy.position_size == 0 and barstate.isconfirmed, title="EMA Pullback BUY", message="BUY Signal on {{ticker}} at {{close}}")
+
+// ======================
+// PLOTS
+// ======================
+plot(emaFast, color=color.teal, title="EMA 9")
+plot(emaSlow, color=color.orange, title="EMA 15")
+
+plotshape(buyCondition, title="BUY Signal", location=location.belowbar, color=color.lime, style=shape.triangleup, size=size.small)
